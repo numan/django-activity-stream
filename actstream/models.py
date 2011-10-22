@@ -12,6 +12,7 @@ from django.conf import settings
 
 from actstream.signals import action
 
+from apps.sgnetworks.models import Sgnetwork
 
 class FollowManager(models.Manager):
     def stream_for_user(self, user):
@@ -116,6 +117,8 @@ class Action(models.Model):
         <a href="http://oebfare.com/">brosner</a> commented on <a href="http://github.com/pinax/pinax">pinax/pinax</a> 2 hours ago
 
     """
+    network = models.ForeignKey(Sgnetwork)
+
     actor_content_type = models.ForeignKey(ContentType,related_name='actor')
     actor_object_id = models.PositiveIntegerField()
     actor = generic.GenericForeignKey('actor_content_type','actor_object_id')
