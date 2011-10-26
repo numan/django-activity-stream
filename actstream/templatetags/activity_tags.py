@@ -2,13 +2,49 @@ from django.template import Variable, Library, Node, TemplateSyntaxError, Templa
 from django.template.loader import render_to_string
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
+from actstream.models import Follow
+
+register = Library()
+
+def is_following(context, instance):
+    try:
+        user = context['user']
+    except KeyError:
+        return False
+    content_type = ContentType.objects.get_for_model(instance).pk
+    return bool(Follow.objects.filter(content_type_id=content_type, user=user, object_id=instance.pk).count())
+
+@register.simple_tag(takes_context=True)
+def activity_follow_label(context, instance, follow, unfollow):
+    if is_following(context, instance):
+        return unfollow
+    return follow
+
+@register.simple_tag(takes_context=True)
+def activity_follow_url(context, instance):
+    content_type = ContentType.objects.get_for_model(instance).pk
+    if is_following(context, instance):
+        return reverse('actstream_unfollow', kwargs={'content_type_id': content_type, 'object_id': instance.pk})
+    return reverse('actstream_follow', kwargs={'content_type_id': content_type, 'object_id': instance.pk})
+
+@register.simple_tag
+def activity_followers_url(instance):
+    content_type = ContentType.objects.get_for_model(instance).pk
+    return reverse('actstream_followers', kwargs={'content_type_id': content_type, 'object_id': instance.pk})
+
+@register.simple_tag
+def activity_followers_count(instance):
+    content_type = ContentType.objects.get_for_model(instance).pk
+    val = Follow.objects.filter(content_type=content_type, object_id=instance.pk).count()
+    return val
 
 
 class DisplayActionLabel(Node):
     def __init__(self, actor, varname=None):
         self.actor = Variable(actor)
         self.varname = varname
-        
+
     def render(self, context):
         actor_instance = self.actor.resolve(context)
         try:
@@ -33,7 +69,7 @@ class DisplayAction(Node):
     def __init__(self, action, varname=None):
         self.action = Variable(action)
         self.varname = varname
-        
+
     def render(self, context):
         action_instance = self.action.resolve(context)
         try:
@@ -44,13 +80,13 @@ class DisplayAction(Node):
             context[self.varname] = action_output
             return ""
         else:
-            return action_output        
-        
+            return action_output
+
 class DisplayActionShort(Node):
     def __init__(self, action, varname=None):
         self.action = Variable(action)
         self.varname = varname
-        
+
     def render(self, context):
         action_instance = self.action.resolve(context)
         try:
@@ -61,13 +97,13 @@ class DisplayActionShort(Node):
             context[self.varname] = action_output
             return ""
         else:
-            return action_output        
-        
+            return action_output
+
 class DisplayGroupedActions(Node):
     def __init__(self, actions, varname=None):
         self.actions = Variable(actions)
         self.varname = varname
-        
+
     def render(self, context):
         actions_instance = self.action.resolve(context)
         try:
@@ -78,8 +114,8 @@ class DisplayGroupedActions(Node):
             context[self.varname] = action_output
             return ""
         else:
-            return action_output        
-        
+            return action_output
+
 def do_print_action(parser, token):
     bits = token.contents.split()
     if len(bits) > 3:
@@ -90,7 +126,7 @@ def do_print_action(parser, token):
         return DisplayAction(bits[1],bits[3])
     else:
         return DisplayAction(bits[1])
-        
+
 def do_print_action_short(parser, token):
     bits = token.contents.split()
     if len(bits) > 3:
@@ -101,7 +137,7 @@ def do_print_action_short(parser, token):
         return DisplayActionShort(bits[1],bits[3])
     else:
         return DisplayActionShort(bits[1])
-        
+
 def do_print_grouped_actions(parser, token):
     bits = token.contents.split()
     if len(bits) > 3:
@@ -112,7 +148,7 @@ def do_print_grouped_actions(parser, token):
         return DisplayAction(bits[1],bits[3])
     else:
         return DisplayAction(bits[1])
-        
+
 def do_print_action_label(parser, token):
     bits = token.contents.split()
     if len(bits) > 3:
@@ -123,19 +159,18 @@ def do_print_action_label(parser, token):
         return DisplayActionLabel(bits[1],bits[3])
     else:
         return DisplayActionLabel(bits[1])
-    
+
 def do_get_user_contenttype(parser, token):
     return UserContentTypeNode(*token.split_contents())
 
 class UserContentTypeNode(Node):
     def __init__(self, *args):
         self.args = args
-        
+
     def render(self, context):
         context[self.args[-1]] = ContentType.objects.get_for_model(User)
         return ''
 
-register = Library()     
 register.tag('display_action', do_print_action)
 register.tag('display_action_short', do_print_action_short)
 register.tag('display_grouped_actions', do_print_grouped_actions)
