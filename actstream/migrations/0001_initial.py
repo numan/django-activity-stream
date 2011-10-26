@@ -23,6 +23,7 @@ class Migration(SchemaMigration):
         # Adding model 'Action'
         db.create_table('actstream_action', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('network', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['sgnetworks.Sgnetwork'])),
             ('actor_content_type', self.gf('django.db.models.fields.related.ForeignKey')(related_name='actor', to=orm['contenttypes.ContentType'])),
             ('actor_object_id', self.gf('django.db.models.fields.PositiveIntegerField')()),
             ('verb', self.gf('django.db.models.fields.CharField')(max_length=255)),
@@ -31,7 +32,7 @@ class Migration(SchemaMigration):
             ('target_object_id', self.gf('django.db.models.fields.PositiveIntegerField')(null=True, blank=True)),
             ('action_object_content_type', self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='action_object', null=True, to=orm['contenttypes.ContentType'])),
             ('action_object_object_id', self.gf('django.db.models.fields.PositiveIntegerField')(null=True, blank=True)),
-            ('timestamp', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
+            ('timestamp', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now)),
             ('public', self.gf('django.db.models.fields.BooleanField')(default=True)),
         ))
         db.send_create_signal('actstream', ['Action'])
@@ -51,17 +52,18 @@ class Migration(SchemaMigration):
 
     models = {
         'actstream.action': {
-            'Meta': {'object_name': 'Action'},
+            'Meta': {'ordering': "('-timestamp',)", 'object_name': 'Action'},
             'action_object_content_type': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'action_object'", 'null': 'True', 'to': "orm['contenttypes.ContentType']"}),
             'action_object_object_id': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
             'actor_content_type': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'actor'", 'to': "orm['contenttypes.ContentType']"}),
             'actor_object_id': ('django.db.models.fields.PositiveIntegerField', [], {}),
             'description': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'network': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['sgnetworks.Sgnetwork']"}),
             'public': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
             'target_content_type': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'target'", 'null': 'True', 'to': "orm['contenttypes.ContentType']"}),
             'target_object_id': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
-            'timestamp': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'timestamp': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now'}),
             'verb': ('django.db.models.fields.CharField', [], {'max_length': '255'})
         },
         'actstream.follow': {
@@ -106,6 +108,20 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'model': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '100'})
+        },
+        'core.container': {
+            'Meta': {'object_name': 'Container'},
+            'child_type': ('django.db.models.fields.CharField', [], {'max_length': '200'}),
+            'description': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'name': ('django.db.models.fields.CharField', [], {'max_length': '200'}),
+            'timestamp': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+        },
+        'sgnetworks.sgnetwork': {
+            'Meta': {'object_name': 'Sgnetwork', '_ormbases': ['core.Container']},
+            'container_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['core.Container']", 'unique': 'True', 'primary_key': 'True'}),
+            'created_on': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'domain': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '200'})
         }
     }
 

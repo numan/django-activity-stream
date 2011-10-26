@@ -54,6 +54,54 @@ class AtomObjectActivityFeed(ObjectActivityFeed):
     feed_type = AtomWithContentFeed
     subtitle = ObjectActivityFeed.description
 
+class ActivityStreamModelMixin:
+    def get_display_name(self):
+        pass
+
+    def get_unique_id(self):
+        pass
+
+    def get_object_type(self):
+        pass
+
+    def get_image_url(self):
+        pass
+
+class JSONActivityStreamFeed:
+    """
+    Custom feed generator for JSON Activity Stream feeds
+    """
+    def add_item_elements(self, handler, item):
+        stream_item = {}
+        stream_item['verb'] = item.verb
+
+        if 'actor' in item:
+            stream_item['actor'] = {}
+            stream_item['actor']['displayName'] = item['actor'].get_display_name()
+            stream_item['actor']['url'] = item['actor'].get_absolute_url()
+            stream_item['actor']['id'] = item['actor'].get_unique_id()
+            stream_item['actor']['objectType'] = item['actor'].get_object_type()
+            stream_item['actor']['image'] = {
+                'url': item['actor'].get_image_url()
+            }
+        if 'object' in item:
+            stream_item['object'] = {}
+            stream_item['object']['displayName'] = item['object'].get_display_name()
+            stream_item['object']['url'] = item['object'].get_absolute_url()
+            stream_item['object']['id'] = item['object'].get_unique_id()
+            stream_item['object']['objectType'] = item['object'].get_object_type()
+
+        if 'target' in item:
+            stream_item['target'] = {}
+            stream_item['target']['displayName'] = item['target'].get_display_name()
+            stream_item['target']['url'] = item['target'].get_absolute_url()
+            stream_item['target']['id'] = item['target'].get_unique_id()
+            stream_item['target']['objectType'] = item['target'].get_object_type()
+            stream_item['target']['image'] = {
+                'url': item['actor'].get_image_url()
+            }
+
+
 class ActivityStreamsFeed(AtomWithContentFeed):
     """
     Custom feed generator for Activity Stream feeds
