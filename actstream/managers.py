@@ -1,12 +1,10 @@
-from operator import or_
+from collections import defaultdict
 
+from django.db import models
 from django.db.models import Q
-from django.db.models.query import QuerySet
 from django.contrib.contenttypes.models import ContentType
 
-from actstream.exceptions import check_actionable_model
-from actstream.gfk import GFKManager, EmptyGFKQuerySet
-from actstream.exceptions import BadQuerySet
+from actstream.gfk import GFKManager
 from actstream.decorators import stream
 
 
@@ -52,19 +50,58 @@ class ActionManager(GFKManager):
         Stream of most recent actions by any particular model
         """
         ctype = ContentType.objects.get_for_model(model)
-        return self.public(Q(target_content_type = ctype)|\
-            Q(action_object_content_type = ctype)|\
-            Q(actor_content_type = ctype))
+        return self.public(
+            Q(target_content_type=ctype) |
+            Q(action_object_content_type=ctype) |
+            Q(actor_content_type=ctype)
+        )
 
     @stream
     def user(self, object, **kwargs):
         """
-        Stream of most recent actions by actors that the passed User object is following
+        Stream of most recent actions by actors that the passed User object is
+        following.
         """
         from actstream.models import Follow
+        q = Q()
+        qs = self.filter(public=True)
+        actors_by_content_type = defaultdict(lambda: [])
 
-        qs = self.get_query_set()
-        for follow in Follow.objects.filter(user=object).select_related('actor'):
-            if follow.actor:
-                qs &= follow.actor.actor_actions.public(**kwargs)
+        follow_gfks = Follow.objects.filter(user=object).values_list(
+            'content_type_id', 'object_id')
+
+        if not follow_gfks:
+            return qs.none()
+
+        for content_type_id, object_id in follow_gfks.iterator():
+            actors_by_content_type[content_type_id].append(object_id)
+
+        for content_type_id, object_ids in actors_by_content_type.iteritems():
+            q = q | Q(
+                actor_content_type=content_type_id,
+                actor_object_id__in=object_ids,
+            )
+        qs = qs.filter(q)
         return qs
+
+
+class FollowManager(models.Manager):
+    """
+    Manager for Follow model.
+    """
+
+    def for_object(self, instance):
+        """
+        Filter to a specific instance.
+        """
+        content_type = ContentType.objects.get_for_model(instance).pk
+        return self.filter(content_type=content_type, object_id=instance.pk)
+
+    def is_following(self, user, instance):
+        """
+        Check if a user is following an instance.
+        """
+        if not user:
+            return False
+        queryset = self.for_object(instance)
+        return queryset.filter(user=user).exists()
