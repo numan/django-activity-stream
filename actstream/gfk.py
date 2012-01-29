@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.db.models import Manager
 from django.db.models.query import QuerySet, EmptyQuerySet
-from django.utils.encoding import smart_unicode
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.generic import GenericForeignKey
+
+from batch_select.models import *
+from batch_select.models import _check_field_exists, _id_attr, _not_exists, _select_related_instances
 
 USE_PREFETCH = getattr(settings, 'USE_PREFETCH', False)
 FETCH_RELATIONS = getattr(settings, 'FETCH_RELATIONS', True)
@@ -32,6 +34,46 @@ class GFKQuerySet(QuerySet):
     Extended in django-activity-stream to allow for multi db, text primary keys and empty querysets
 
     """
+    def _clone(self, *args, **kwargs):
+        query = super(GFKQuerySet, self)._clone(*args, **kwargs)
+        batches = getattr(self, '_batches', None)
+        if batches:
+            query._batches = set(batches)
+        return query
+
+    def _create_batch(self, batch_or_str, target_field_name=None):
+        batch = batch_or_str
+        if isinstance(batch_or_str, basestring):
+            batch = Batch(batch_or_str)
+        if target_field_name:
+            batch.target_field_name = target_field_name
+
+        _check_field_exists(self.model, batch.m2m_fieldname)
+        return batch
+
+    def batch_select(self, *batches, **named_batches):
+        batches = getattr(self, '_batches', set()) | \
+                  set(self._create_batch(batch) for batch in batches) | \
+                  set(self._create_batch(batch, target_field_name) \
+                        for target_field_name, batch in named_batches.items())
+
+        query = self._clone()
+        query._batches = batches
+        return query
+
+    def iterator(self):
+        result_iter = super(GFKQuerySet, self).iterator()
+        batches = getattr(self, '_batches', None)
+        if batches:
+            results = list(result_iter)
+            for batch in batches:
+                results = batch_select(self.model, results,
+                                       batch.target_field_name,
+                                       batch.m2m_fieldname,
+                                       batch.replay)
+            return iter(results)
+        return result_iter
+
     def fetch_generic_relations(self):
         qs = self._clone()
 
@@ -57,9 +99,13 @@ class GFKQuerySet(QuerySet):
             if ct_id:
                 ct = ctypes[ct_id]
                 model_class = ct.model_class()
-                for o in model_class.objects.select_related().filter(pk__in=items_.keys()):
-                    (gfk_name, item_id) = items_[smart_unicode(o.pk)]
-                    data_map[(ct_id, smart_unicode(o.pk))] = o
+                if hasattr(model_class.objects, 'all_with_deleted'):
+                    objs = model_class.objects.all_with_deleted().select_related().filter(pk__in=items_.keys())
+                else:
+                    objs = model_class.objects.select_related().filter(pk__in=items_.keys())
+                for o in objs:
+                    (gfk_name, item_id) = items_[o.pk]
+                    data_map[(ct_id, o.pk)] = o
 
         for item in qs:
             for gfk in gfk_fields:

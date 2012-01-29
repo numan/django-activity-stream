@@ -12,6 +12,8 @@ from django.contrib.contenttypes import generic
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 
+from apps.sgnetworks.models import Sgnetwork
+
 from actstream.settings import MODELS, TEMPLATE, MANAGER_MODULE
 from actstream.exceptions import check_actionable_model
 
@@ -22,7 +24,7 @@ class Follow(models.Model):
     user = models.ForeignKey(User)
 
     content_type = models.ForeignKey(ContentType)
-    object_id = models.TextField()
+    object_id = models.PositiveIntegerField()
     actor = generic.GenericForeignKey()
 
     class Meta:
@@ -59,19 +61,21 @@ class Action(models.Model):
         <a href="http://oebfare.com/">brosner</a> commented on <a href="http://github.com/pinax/pinax">pinax/pinax</a> 2 hours ago
 
     """
+    network = models.ForeignKey(Sgnetwork)
+
     actor_content_type = models.ForeignKey(ContentType,related_name='actor')
-    actor_object_id = models.TextField()
+    actor_object_id = models.PositiveIntegerField()
     actor = generic.GenericForeignKey('actor_content_type','actor_object_id')
 
     verb = models.CharField(max_length=255)
     description = models.TextField(blank=True,null=True)
 
     target_content_type = models.ForeignKey(ContentType,related_name='target',blank=True,null=True)
-    target_object_id = models.TextField(blank=True,null=True)
+    target_object_id = models.PositiveIntegerField(blank=True,null=True)
     target = generic.GenericForeignKey('target_content_type','target_object_id')
 
     action_object_content_type = models.ForeignKey(ContentType,related_name='action_object',blank=True,null=True)
-    action_object_object_id = models.TextField(blank=True,null=True)
+    action_object_object_id = models.PositiveIntegerField(blank=True,null=True)
     action_object = generic.GenericForeignKey('action_object_content_type','action_object_object_id')
 
     timestamp = models.DateTimeField(default=datetime.now)

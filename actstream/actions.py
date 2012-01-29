@@ -85,11 +85,13 @@ def action_handler(verb, **kwargs):
     kwargs.pop('signal', None)
     actor = kwargs.pop('sender')
     check_actionable_model(actor)
+    network = kwargs.pop('network')
     newaction = Action(actor_content_type = ContentType.objects.get_for_model(actor),
                     actor_object_id = actor.pk,
                     verb = unicode(verb),
                     public = bool(kwargs.pop('public', True)),
                     description = kwargs.pop('description', None),
+                    network = network,
                     timestamp = kwargs.pop('timestamp', datetime.now()))
 
     for opt in ('target', 'action_object'):
@@ -101,5 +103,6 @@ def action_handler(verb, **kwargs):
                     ContentType.objects.get_for_model(obj))
 
     newaction.save()
+    return newaction
 
 action.connect(action_handler, dispatch_uid='actstream.models')
