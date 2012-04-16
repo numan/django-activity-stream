@@ -96,7 +96,7 @@ class GFKQuerySet(QuerySet):
             for gfk in gfk_fields:
                 ct_id_field = self.model._meta.get_field(gfk.ct_field).column
                 ct_map.setdefault(getattr(item, ct_id_field), {}
-                    )[smart_unicode(getattr(item, gfk.fk_field))] = (gfk.name,
+                    )[getattr(item, gfk.fk_field)] = (gfk.name,
                         item.pk)
 
         ctypes = ContentType.objects.using(self.db).in_bulk(ct_map.keys())
@@ -108,7 +108,7 @@ class GFKQuerySet(QuerySet):
                 if hasattr(model_class._default_manager, 'all_with_deleted'):
                     objects = model_class._default_manager.all_with_deleted().select_related()
                 else:
-                    objects = model_class.objects.select_related()
+                    objects = model_class._default_manager.select_related()
                 for o in objects.filter(pk__in=items_.keys()):
                     (gfk_name, item_id) = items_[o.pk]
                     data_map[(ct_id, o.pk)] = o
@@ -121,7 +121,7 @@ class GFKQuerySet(QuerySet):
                     setattr(item, gfk.name,
                         data_map[(
                             getattr(item, ct_id_field),
-                            smart_unicode(getattr(item, gfk.fk_field))
+                            getattr(item, gfk.fk_field)
                         )])
 
         return qs
