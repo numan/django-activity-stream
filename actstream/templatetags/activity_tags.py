@@ -10,11 +10,9 @@ from actstream.models import Follow
 register = Library()
 
 
-def is_following(context, instance):
-    return Follow.objects.is_following(context.get('user'), instance)
+def _is_following_helper(context, actor):
+    return Follow.objects.is_following(context.get('user'), actor)
 
-
-<<<<<<< HEAD
 class DisplayActivityFollowLabel(Node):
     def __init__(self, actor, follow, unfollow):
         self.actor = Variable(actor)
@@ -23,10 +21,9 @@ class DisplayActivityFollowLabel(Node):
 
     def render(self, context):
         actor_instance = self.actor.resolve(context)
-        if is_following(context, actor_instance):
+        if _is_following_helper(context, actor_instance):
             return self.follow
-        else:
-            return self.unfollow
+        return self.unfollow
 
 def do_activity_follow_label(parser, tokens):
     bits = tokens.contents.split()
@@ -42,7 +39,7 @@ class DisplayActivityFollowUrl(Node):
     def render(self, context):
         actor_instance = self.actor.resolve(context)
         content_type = ContentType.objects.get_for_model(actor_instance).pk
-        if is_following(context, actor_instance):
+        if _is_following_helper(context, actor_instance):
             return reverse('actstream_unfollow', kwargs={'content_type_id': content_type, 'object_id': actor_instance.pk})
         return reverse('actstream_follow', kwargs={'content_type_id': content_type, 'object_id': actor_instance.pk})
 
@@ -52,24 +49,6 @@ def do_activity_follow_url(parser, tokens):
         raise TemplateSyntaxError, "Accepted format {% activity_follow_url [instance] %}"
     else:
         return DisplayActivityFollowUrl(bits[1])
-=======
-@register.simple_tag(takes_context=True)
-def activity_follow_label(context, instance, follow, unfollow):
-    if is_following(context, instance):
-        return unfollow
-    return follow
-
-
-@register.simple_tag(takes_context=True)
-def activity_follow_url(context, instance):
-    content_type = ContentType.objects.get_for_model(instance).pk
-    if is_following(context, instance):
-        return reverse('actstream_unfollow',
-            kwargs={'content_type_id': content_type, 'object_id': instance.pk})
-    return reverse('actstream_follow',
-        kwargs={'content_type_id': content_type, 'object_id': instance.pk})
-
->>>>>>> fa2dd7742f31e7870638b5893e20a99877b72ff0
 
 @register.simple_tag
 def activity_followers_url(instance):
@@ -195,15 +174,6 @@ class UserContentTypeNode(Node):
         context[self.args[-1]] = ContentType.objects.get_for_model(User)
         return ''
 
-<<<<<<< HEAD
-register.tag('activity_follow_label', do_activity_follow_label)
-register.tag('activity_follow_url', do_activity_follow_url)
-register.tag('display_action', do_print_action)
-register.tag('display_action_short', do_print_action_short)
-register.tag('display_grouped_actions', do_print_grouped_actions)
-register.tag('action_label', do_print_action_label)
-register.tag('get_user_contenttype', do_get_user_contenttype)
-=======
 
 def display_action(parser, token):
     return DisplayAction.handle_token(parser, token)
@@ -225,10 +195,14 @@ def action_label(parser, token):
 def get_user_contenttype(parser, token):
     return UserContentTypeNode(*token.split_contents())
 
+def is_following(user, actor):
+    return Follow.objects.is_following(user, actor)
 
+register.filter(is_following)
 register.tag(display_action)
 register.tag(display_action_short)
 register.tag(display_grouped_actions)
 register.tag(action_label)
 register.tag(get_user_contenttype)
->>>>>>> fa2dd7742f31e7870638b5893e20a99877b72ff0
+register.tag('activity_follow_url', do_activity_follow_url)
+register.tag('activity_follow_label', do_activity_follow_label)

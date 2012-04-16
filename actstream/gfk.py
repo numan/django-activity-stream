@@ -95,6 +95,7 @@ class GFKQuerySet(QuerySet):
         for item in qs:
             for gfk in gfk_fields:
                 ct_id_field = self.model._meta.get_field(gfk.ct_field).column
+                if getattr(item, ct_id_field) is None: continue
                 ct_map.setdefault(getattr(item, ct_id_field), {}
                     )[getattr(item, gfk.fk_field)] = (gfk.name,
                         item.pk)

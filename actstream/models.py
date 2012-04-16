@@ -1,18 +1,17 @@
 from datetime import datetime
 
 from django.db import models
-from django.conf import settings
 from django.core.urlresolvers import reverse
-from django.template.loader import render_to_string
+from django.utils.translation import ugettext as _
 
 from django.contrib.contenttypes import generic
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 
 from apps.sgnetworks.models import Sgnetwork
-from actstream import managers
-
-from actstream.settings import MODELS, TEMPLATE, MANAGER_MODULE
+from actstream import managers, settings as actstream_settings
+from actstream.signals import action
+from actstream.actions import action_handler
 
 
 class Follow(models.Model):
@@ -23,15 +22,16 @@ class Follow(models.Model):
 
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
-    actor = generic.GenericForeignKey()
-
+    follow_object = generic.GenericForeignKey()
+    actor_only = models.BooleanField("Only follow actions where the object is "
+        "the target.", default=True)
     objects = managers.FollowManager()
 
     class Meta:
         unique_together = ('user', 'content_type', 'object_id')
 
     def __unicode__(self):
-        return u'%s -> %s' % (self.user, self.actor)
+        return u'%s -> %s' % (self.user, self.follow_object)
 
 
 class Action(models.Model):
@@ -89,24 +89,26 @@ class Action(models.Model):
 
     public = models.BooleanField(default=True)
 
-    objects = MANAGER_MODULE()
+    objects = actstream_settings.MANAGER_MODULE()
 
     class Meta:
         ordering = ('-timestamp', )
 
     def __unicode__(self):
-        if settings.USE_I18N:
-            return render_to_string(TEMPLATE, {'action': self}).strip()
+        ctx = {
+            'actor': self.actor,
+            'verb': self.verb,
+            'action_object': self.action_object,
+            'target': self.target,
+            'timesince': self.timesince()
+        }
         if self.target:
             if self.action_object:
-                return u'%s %s %s on %s %s ago' % (self.actor, self.verb,
-                    self.action_object, self.target, self.timesince())
-            return u'%s %s %s %s ago' % (self.actor, self.verb, self.target,
-                self.timesince())
+                return _('%(actor)s %(verb)s %(action_object)s on %(target)s %(timesince)s ago') % ctx
+            return _('%(actor)s %(verb)s %(target)s %(timesince)s ago') % ctx
         if self.action_object:
-            return u'%s %s %s %s ago' % (self.actor, self.verb,
-                self.action_object, self.timesince())
-        return u'%s %s %s ago' % (self.actor, self.verb, self.timesince())
+            return _('%(actor)s %(verb)s %(action_object)s %(timesince)s ago') % ctx
+        return _('%(actor)s %(verb)s %(timesince)s ago') % ctx
 
     def actor_url(self):
         """
@@ -149,19 +151,28 @@ target_stream = Action.objects.target
 user_stream = Action.objects.user
 model_stream = Action.objects.model_actions
 
-# setup GenericRelations for actionable models
-for model in MODELS.values():
-    if not model:
-        continue
-    opts = model._meta
-    for field in ('actor', 'target', 'action_object'):
-        generic.GenericRelation(Action,
-            content_type_field='%s_content_type' % field,
-            object_id_field='%s_object_id' % field,
-            related_name='actions_with_%s_%s_as_%s' % (
-                model._meta.app_label, model._meta.module_name, field),
-        ).contribute_to_class(model, '%s_actions' % field)
 
-        # @@@ I'm not entirely sure why this works
-        setattr(Action, 'actions_with_%s_%s_as_%s' % (model._meta.app_label,
-            model._meta.module_name, field), None)
+def setup_generic_relations():
+    """
+    Set up GenericRelations for actionable models.
+    """
+    for model in actstream_settings.MODELS.values():
+        if not model:
+            continue
+        for field in ('actor', 'target', 'action_object'):
+            generic.GenericRelation(Action,
+                content_type_field='%s_content_type' % field,
+                object_id_field='%s_object_id' % field,
+                related_name='actions_with_%s_%s_as_%s' % (
+                    model._meta.app_label, model._meta.module_name, field),
+            ).contribute_to_class(model, '%s_actions' % field)
+
+            # @@@ I'm not entirely sure why this works
+            setattr(Action, 'actions_with_%s_%s_as_%s' % (
+                model._meta.app_label, model._meta.module_name, field), None)
+
+
+setup_generic_relations()
+
+# connect the signal
+action.connect(action_handler, dispatch_uid='actstream.models')
