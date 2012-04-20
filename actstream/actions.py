@@ -37,6 +37,7 @@ def follow(user, obj, send_action=True, actor_only=True):
     return follow
 
 
+
 def unfollow(user, obj, send_action=False):
     """
     Removes a "follow" relationship.
@@ -74,6 +75,7 @@ def is_following(user, obj):
         content_type=ContentType.objects.get_for_model(obj)).count())
 
 
+
 def action_handler(verb, **kwargs):
     """
     Handler function to create Action instance upon action signal call.
@@ -83,12 +85,14 @@ def action_handler(verb, **kwargs):
     kwargs.pop('signal', None)
     actor = kwargs.pop('sender')
     check_actionable_model(actor)
+    network = kwargs.pop('network')
     newaction = Action(
         actor_content_type=ContentType.objects.get_for_model(actor),
         actor_object_id=actor.pk,
         verb=unicode(verb),
         public=bool(kwargs.pop('public', True)),
         description=kwargs.pop('description', None),
+        network = network,
         timestamp=kwargs.pop('timestamp', datetime.now())
     )
 
@@ -101,3 +105,5 @@ def action_handler(verb, **kwargs):
                     ContentType.objects.get_for_model(obj))
 
     newaction.save()
+    return newaction
+

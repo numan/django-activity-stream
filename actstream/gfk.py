@@ -2,13 +2,15 @@ import django
 from django.conf import settings
 from django.db.models import Manager
 from django.db.models.query import QuerySet, EmptyQuerySet
-from django.utils.encoding import smart_unicode
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.generic import GenericForeignKey
 
-USE_PREFETCH = getattr(settings, 'USE_PREFETCH',
-                       django.VERSION[0] == 1 and django.VERSION[1] >= 4)
+from batch_select.models import *
+from batch_select.models import _check_field_exists, _id_attr, _not_exists, _select_related_instances.
+
+USE_PREFETCH = getattr(settings, 'USE_PREFETCH', False)
+
 FETCH_RELATIONS = getattr(settings, 'FETCH_RELATIONS', True)
 
 
@@ -66,7 +68,10 @@ class GFKQuerySet(QuerySet):
             if ct_id:
                 ct = ctypes[ct_id]
                 model_class = ct.model_class()
-                objects = model_class._default_manager.select_related()
+                if hasattr(model_class._default_manager, 'all_with_deleted'):
+                    objects = model_class._default_manager.all_with_deleted().select_related()
+                else:
+                    objects = model_class._default_manager.select_related()
                 for o in objects.filter(pk__in=items_.keys()):
                     (gfk_name, item_id) = items_[smart_unicode(o.pk)]
                     data_map[(ct_id, smart_unicode(o.pk))] = o
@@ -79,7 +84,7 @@ class GFKQuerySet(QuerySet):
                     setattr(item, gfk.name,
                         data_map[(
                             getattr(item, ct_id_field),
-                            smart_unicode(getattr(item, gfk.fk_field))
+                            getattr(item, gfk.fk_field)
                         )])
 
         return qs
@@ -91,3 +96,6 @@ class GFKQuerySet(QuerySet):
 class EmptyGFKQuerySet(GFKQuerySet, EmptyQuerySet):
     def fetch_generic_relations(self):
         return self
+
+
+

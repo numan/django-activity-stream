@@ -11,6 +11,7 @@ class ActionAdmin(admin.ModelAdmin):
                      'action_object_content_type')
 
 
+
 class FollowAdmin(admin.ModelAdmin):
     list_display = ('__unicode__', 'user', 'follow_object', 'actor_only')
     list_editable = ('user',)

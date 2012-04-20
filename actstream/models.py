@@ -8,6 +8,8 @@ from django.contrib.contenttypes import generic
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 
+from apps.sgnetworks.models import Sgnetwork
+
 from actstream import managers, settings as actstream_settings
 from actstream.signals import action
 from actstream.actions import action_handler
@@ -20,10 +22,12 @@ class Follow(models.Model):
     user = models.ForeignKey(User)
 
     content_type = models.ForeignKey(ContentType)
-    object_id = models.CharField(max_length=255)
+    object_id = models.PositiveIntegerField()
     follow_object = generic.GenericForeignKey()
     actor_only = models.BooleanField("Only follow actions where the object is "
         "the target.", default=True)
+    objects = managers.FollowManager()
+
     objects = managers.FollowManager()
 
     class Meta:
@@ -31,6 +35,7 @@ class Follow(models.Model):
 
     def __unicode__(self):
         return u'%s -> %s' % (self.user, self.follow_object)
+
 
 
 class Action(models.Model):
@@ -62,8 +67,10 @@ class Action(models.Model):
         <a href="http://oebfare.com/">brosner</a> commented on <a href="http://github.com/pinax/pinax">pinax/pinax</a> 2 hours ago
 
     """
+    network = models.ForeignKey(Sgnetwork)
+
     actor_content_type = models.ForeignKey(ContentType, related_name='actor')
-    actor_object_id = models.CharField(max_length=255)
+    actor_object_id = models.PositiveIntegerField()
     actor = generic.GenericForeignKey('actor_content_type', 'actor_object_id')
 
     verb = models.CharField(max_length=255)
@@ -71,14 +78,13 @@ class Action(models.Model):
 
     target_content_type = models.ForeignKey(ContentType, related_name='target',
         blank=True, null=True)
-    target_object_id = models.CharField(max_length=255, blank=True, null=True)
+    target_object_id = models.PositiveIntegerField(blank=True,null=True)
     target = generic.GenericForeignKey('target_content_type',
         'target_object_id')
 
     action_object_content_type = models.ForeignKey(ContentType,
         related_name='action_object', blank=True, null=True)
-    action_object_object_id = models.CharField(max_length=255, blank=True,
-        null=True)
+    action_object_object_id = models.PositiveIntegerField(blank=True,null=True)
     action_object = generic.GenericForeignKey('action_object_content_type',
         'action_object_object_id')
 
@@ -103,6 +109,7 @@ class Action(models.Model):
             if self.action_object:
                 return _('%(actor)s %(verb)s %(action_object)s on %(target)s %(timesince)s ago') % ctx
             return _('%(actor)s %(verb)s %(target)s %(timesince)s ago') % ctx
+                self.timesince())
         if self.action_object:
             return _('%(actor)s %(verb)s %(action_object)s %(timesince)s ago') % ctx
         return _('%(actor)s %(verb)s %(timesince)s ago') % ctx
